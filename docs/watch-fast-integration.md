@@ -1,14 +1,16 @@
 # Como usar o `ui.frontend` com este proxy (modo rápido)
 
-Este documento explica o processo para o `ui.frontend` do projeto `apex-madeinbrazil` gerar os arquivos que este proxy consome, com o menor tempo de espera possível entre uma alteração de código e o reflexo no navegador.
+Este documento explica o processo para o `ui.frontend` de um projeto AEM gerar os arquivos que este proxy consome, com o menor tempo de espera possível entre uma alteração de código e o reflexo no navegador.
 
 ## Contexto
 
 O proxy (`server.mjs`) serve os assets estáticos direto da pasta apontada por `frontendDist` (ver [proxy.config.mjs](../proxy.config.mjs)):
 
 ```js
-frontendDist: '/home/wilson/aem-projects/apex-aem-modules/apex-integration/apex-madeinbrazil/ui.frontend/dist/clientlib-site',
+frontendDist: '/caminho/para/seu-projeto-aem/ui.frontend/dist/clientlib-site',
 ```
+
+Substitua `/caminho/para/seu-projeto-aem` pelo caminho do projeto AEM na sua máquina.
 
 Ele também observa essa pasta com `fs.watch(..., { recursive: true })` e, quando `hotReload: true`, dispara um reload automático no navegador (via Server-Sent Events) assim que os arquivos mudam.
 
@@ -33,7 +35,7 @@ Resultado medido: ~2 segundos por alteração, ao invés de ~2 minutos.
 Terminal 1 — dentro de `ui.frontend`:
 
 ```bash
-cd /home/wilson/aem-projects/apex-aem-modules/apex-integration/apex-madeinbrazil/ui.frontend
+cd /caminho/para/seu-projeto-aem/ui.frontend
 npm run watch:fast
 ```
 
@@ -45,7 +47,7 @@ Deixe esse processo rodando. Ele vai:
 Terminal 2 — dentro deste projeto de proxy:
 
 ```bash
-cd /home/wilson/projects/proxy-aem
+cd /caminho/para/proxy-aem-frontend
 npm start
 ```
 
