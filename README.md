@@ -8,6 +8,8 @@
 
 O proxy só intercepta CSS, JavaScript e arquivos auxiliares abaixo de `localClientlibPrefix`; todo o restante continua vindo do Publish remoto.
 
+Requisições POST são encaminhadas com o corpo e o Content-Type originais. Quando o Referer aponta para o próprio proxy, sua origem é substituída pela origem do AEM remoto; o caminho e os parâmetros são preservados. Outros valores de Referer não são alterados. Isso não substitui autenticação, tokens CSRF ou as permissões exigidas pelo AEM.
+
 Com `debug: true` na configuração, cada requisição aparece no terminal com método, URL, destino, status HTTP e duração:
 
 ```text

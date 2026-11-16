@@ -52,9 +52,18 @@ function disableCache(res) {
   });
 }
 
-function removeOrigin(proxyReq) {
-  // Evita que cookies de domínio de produção sejam enviados como localhost.
+function prepareProxyRequest(proxyReq, req) {
   proxyReq.removeHeader('origin');
+
+  const referer = req.headers.referer;
+  const localUrl = `${req.protocol}://${req.headers.host}`;
+  if (req.method !== 'POST' || !referer || !URL.canParse(referer) || !URL.canParse(localUrl)) return;
+
+  const refererUrl = new URL(referer);
+  if (refererUrl.origin !== new URL(localUrl).origin) return;
+
+  const targetOrigin = new URL(config.target).origin;
+  proxyReq.setHeader('referer', `${targetOrigin}${refererUrl.pathname}${refererUrl.search}${refererUrl.hash}`);
 }
 
 function startLiveReloadWatcher() {
@@ -141,7 +150,7 @@ const htmlProxy = createProxyMiddleware({
   secure: true,
   selfHandleResponse: true,
   on: {
-    proxyReq: removeOrigin,
+    proxyReq: prepareProxyRequest,
     proxyRes: responseInterceptor(async (responseBuffer, proxyRes) => {
       const contentType = proxyRes.headers['content-type'] ?? '';
       if (!contentType.includes('text/html')) return responseBuffer;
@@ -169,11 +178,11 @@ app.use('/', createProxyMiddleware({
   secure: true,
   selfHandleResponse: false,
   on: {
-    proxyReq: removeOrigin
+    proxyReq: prepareProxyRequest
   }
 }));
 
-app.listen(config.port, (error) => {
+export const server = app.listen(config.port, (error) => {
   if (error) {
     console.error(`Falha ao iniciar o proxy na porta ${config.port}: ${error.message}`);
     process.exitCode = 1;
