@@ -1,8 +1,67 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { once } from 'node:events';
+import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import config from '../proxy.config.mjs';
+
+test('seleciona a configuracao pelo site e falha sem fallback para configuracoes invalidas', async (t) => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const fixture = await mkdtemp(path.join(root, '.proxy-config-test-'));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  await copyFile(new URL('../server.mjs', import.meta.url), path.join(fixture, 'server.mjs'));
+
+  for (const [file, prefix] of [
+    ['proxy.config.mjs', '/default'],
+    ['proxy.config.apexbrasil.mjs', '/apexbrasil']
+  ]) {
+    await writeFile(path.join(fixture, file), `export default ${JSON.stringify({
+      target: 'http://127.0.0.1',
+      port: 0,
+      hotReload: false,
+      localClientlibPrefix: prefix,
+      frontendDist: fixture,
+      assets: {}
+    })};`);
+  }
+  await writeFile(path.join(fixture, 'proxy.config.broken.mjs'), 'throw new Error("config quebrada");');
+
+  const run = promisify(execFile);
+  const serverUrl = pathToFileURL(path.join(fixture, 'server.mjs')).href;
+  const script = `
+    const { server } = await import(${JSON.stringify(serverUrl)});
+    await import('node:events').then(({ once }) => once(server, 'listening'));
+    const response = await fetch('http://localhost:' + server.address().port + '/__proxy_aem_live_reload.js');
+    if (response.status !== 200) throw new Error('Proxy indisponivel');
+    await new Promise(resolve => server.close(resolve));
+  `;
+  const options = { cwd: os.tmpdir(), timeout: 10000 };
+  for (const [args, file, prefix] of [
+    [[], 'proxy.config.mjs', '/default'],
+    [['apexbrasil'], 'proxy.config.apexbrasil.mjs', '/apexbrasil']
+  ]) {
+    const { stdout } = await run(process.execPath, ['--input-type=module', '-e', script, 'server.mjs', ...args], options);
+    assert.ok(stdout.includes(`Configuracao: ${file}`));
+    assert.ok(stdout.includes(`Clientlib local: ${prefix}`));
+  }
+
+  for (const [args, message] of [
+    [['missing'], /Falha ao carregar a configuracao proxy\.config\.missing\.mjs/],
+    [['broken'], /config quebrada/],
+    [['../apexbrasil'], /Uso: node server\.mjs/],
+    [['apexbrasil', 'extra'], /Uso: node server\.mjs/]
+  ]) {
+    await assert.rejects(
+      run(process.execPath, ['--input-type=module', '-e', script, 'server.mjs', ...args], options),
+      error => error.code !== 0 && message.test(error.stderr)
+    );
+  }
+});
 
 test('encaminha POSTs e ajusta apenas o Referer do próprio proxy', async (t) => {
   const upstream = http.createServer((req, res) => {

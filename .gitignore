@@ -1,4 +1,5 @@
 node_modules/
 proxy.config.mjs
+proxy.config.*.mjs
 npm-debug.log*
 .DS_Store

@@ -2,7 +2,19 @@ import express from 'express';
 import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
 import fs from 'node:fs';
 import path from 'node:path';
-import config from './proxy.config.mjs';
+
+const site = process.argv[2];
+if (process.argv.length > 3 || (site !== undefined && !/^[a-zA-Z0-9_-]+$/.test(site))) {
+  throw new Error('Uso: node server.mjs [site] (letras, numeros, "_" ou "-").');
+}
+
+const configFile = site === undefined ? 'proxy.config.mjs' : `proxy.config.${site}.mjs`;
+let config;
+try {
+  ({ default: config } = await import(new URL(`./${configFile}`, import.meta.url)));
+} catch (error) {
+  throw new Error(`Falha ao carregar a configuracao ${configFile}: ${error.message}`, { cause: error });
+}
 
 const app = express();
 app.disable('etag');
@@ -189,6 +201,7 @@ export const server = app.listen(config.port, (error) => {
     return;
   }
 
+  console.log(`Configuracao: ${configFile}`);
   console.log(`Proxy local: http://localhost:${config.port}`);
   console.log(`AEM remoto: ${config.target}`);
   console.log(`Clientlib local: ${prefix}`);
